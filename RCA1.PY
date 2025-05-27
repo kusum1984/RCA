@@ -40,7 +40,20 @@ vector_db = Chroma(
     persist_directory=CHROMA_DB_PATH,
     embedding_function=embeddings
 )
+"""
+Purpose:
 
+Converts historical CAPA PDFs into searchable vectors
+
+Creates a knowledge base for semantic search
+
+Why Used:
+
+ChromaDB: Lightweight, local vector store that preserves data privacy
+
+Embeddings: Convert text to vectors to enable meaning-based search (not just keyword matching)
+
+Persistent storage: Retains knowledge between sessions"""
 # --------------------------
 # Semantic Search Tool
 # --------------------------
@@ -51,10 +64,37 @@ def semantic_search(query: str) -> str:
     # Process docs to remove similar cases display
     return "\n".join([d.page_content.split("Similar Cases:")[0] for d in docs])
 
+"""
+Purpose:
+
+Finds relevant historical CAPAs based on meaning (not just keywords)
+
+Why Used:
+
+Semantic over similarity: Understands context (e.g., "contamination" matches "particulate matter")
+
+Filtering: Removes similar cases display per your requirements
+
+Precision: k=3 returns only the most relevant cases to reduce noise
+
+
+"""
 # --------------------------
 # Specialized Tools
 # --------------------------
+"""
+Purpose:
 
+Systematically identifies underlying causes using proven frameworks
+
+Why Used:
+
+5 Whys: Drills down to root cause (e.g., "Why? → Why? → Why?")
+
+Fishbone: Categorizes causes (People/Methods/Materials/etc.)
+
+Structured output: Returns ranked causes with confidence levels
+"""
 def rca_framework(description: str) -> str:
     """Root Cause Analysis framework tool"""
     prompt = ChatPromptTemplate.from_template(
@@ -69,6 +109,22 @@ def rca_framework(description: str) -> str:
     )
     chain = prompt | llm | StrOutputParser()
     return chain.invoke({"description": description})
+
+
+
+"""
+Purpose:
+
+Quantifies severity of the CAPA issue
+
+Why Used:
+
+Weighted factors: Prioritizes safety/regulatory impact
+
+Normalized score (0-1): Allows comparison across CAPAs
+
+Automated consistency: Removes subjective human bias
+"""
 
 def impact_scorer(description: str) -> float:
     """Impact scoring tool"""
@@ -87,6 +143,22 @@ def impact_scorer(description: str) -> float:
         return float(chain.invoke({"description": description}))
     except:
         return 0.5
+
+
+"""
+Purpose:
+
+Captures user corrections to improve future analyses
+
+Why Used:
+
+Continuous learning: Updates vector embeddings with corrected root causes
+
+Adaptive system: Becomes more accurate over time
+
+Closed-loop: Implements your requirement for feedback integration
+
+"""
 
 def feedback_logger(feedback: str) -> str:
     """Tool for processing feedback"""
