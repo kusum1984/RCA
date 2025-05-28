@@ -78,6 +78,64 @@ def semantic_search(query: str) -> str:
     docs = vector_db.similarity_search(query, k=3)
     return "\n".join([d.page_content for d in docs])
 
+"""
+1) 5 Whys: Drills down to root cause (e.g., "Why? → Why? → Why?")
+
+2) Fishbone: Categorizes causes (People/Methods/Materials/etc.)
+
+3) Fault Tree Analysis (FTA) Explanation
+What it is:
+
+A top-down, deductive failure analysis method
+
+Uses Boolean logic to model causal relationships
+
+Visualized as an inverted tree with:
+
+Top event (failure) as the root
+
+Intermediate events as branches
+
+Basic causes as leaves
+
+How it works :
+
+
+Fault tree analysis  # << This triggers the LLM to:
+   a. Identify the top-level failure (from CAPA description)
+   b. Decompose into contributing factors
+   c. Apply AND/OR gates to determine combinations
+   d. Trace paths to fundamental causes
+
+Confidence Level Calculation
+How it's determined:
+
+The LLM evaluates each root cause using:
+
+Evidence strength: How directly the cause explains the effect
+
+Path certainty: Clearness of the fault tree path
+
+Historical correlation: Frequency in similar CAPAs
+
+Scoring approach:
+
+Example
+# Hypothetical LLM reasoning process
+causes = [
+    {
+        "cause": "Inadequate staff training",
+        "evidence": ["No training records", "Similar past incidents"],
+        "confidence": 0.85  # 85%
+    },
+    {
+        "cause": "Equipment calibration drift",
+        "evidence": ["Last calibration 6mo ago"],
+        "confidence": 0.65
+    }
+]   
+
+   """
 def rca_framework(description: str) -> str:
     prompt = ChatPromptTemplate.from_template(
         """Analyze this CAPA description using:
