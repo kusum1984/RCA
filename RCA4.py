@@ -73,7 +73,13 @@ llm = AzureChatOpenAI(
     model_name="gpt-4",
     temperature=0.3
 )
+"""
+Semantic over similarity: Understands context (e.g., "contamination" matches "particulate matter")
 
+Filtering: Removes similar cases display per your requirements
+
+Precision: k=3 returns only the most relevant cases to reduce noise
+"""
 def semantic_search(query: str) -> str:
     docs = vector_db.similarity_search(query, k=3)
     return "\n".join([d.page_content for d in docs])
@@ -149,6 +155,22 @@ def rca_framework(description: str) -> str:
     )
     chain = prompt | llm | StrOutputParser()
     return chain.invoke({"description": description})
+
+
+"""
+Purpose:
+
+Quantifies severity of the CAPA issue
+
+Why Used:
+
+Weighted factors: Prioritizes safety/regulatory impact
+
+Normalized score (0-1): Allows comparison across CAPAs
+
+Automated consistency: Removes subjective human bias
+"""
+
 
 def impact_scorer(description: str) -> float:
     prompt = ChatPromptTemplate.from_template(
