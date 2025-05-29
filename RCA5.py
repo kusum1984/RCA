@@ -215,7 +215,7 @@ workflow.add_conditional_edges(
     {"handle_feedback": "handle_feedback", END: END}
 )
 workflow.add_edge("handle_feedback", END)
-
+workflow.set_finish_point(END)
 capa_workflow = workflow.compile()
 
 # --------------------------
