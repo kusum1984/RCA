@@ -1,3 +1,136 @@
+CREATE OR REPLACE TABLE delivery_report AS
+WITH 
+  filtered_ekpo AS (
+    SELECT 
+      EBELN AS `PO Number`,
+      EBELP AS `PO Item`,
+      MATNR AS `Material`,
+      WERKS AS `Plant`
+    FROM EKPO
+    WHERE WERKS = 'CA01'
+  ),
+  adrc_renamed AS (
+    SELECT 
+      ADDRNUMBER,
+      COUNTRY AS `Vendor Country`
+    FROM ADRC
+  ),
+  eket_renamed AS (
+    SELECT 
+      EBELN,
+      EBELP,
+      CHARG AS `Batch`,
+      EINDT AS `Delivery Date`,
+      GLMNG AS `Delivery Quantity unit`
+    FROM EKET
+  ),
+  ekko_renamed AS (
+    SELECT 
+      EBELN,
+      AEDAT AS `Delivery Created Date`,
+      LIFNR
+    FROM EKKO
+  ),
+  lfa1_renamed AS (
+    SELECT 
+      LIFNR AS `Vendor`,
+      NAME1 AS `Vendor Name`,
+      ADRNR
+    FROM LFA1
+  ),
+  t001w_renamed AS (
+    SELECT 
+      WERKS AS `Plant`,
+      NAME1 AS `Plant Name`
+    FROM T001W
+  ),
+  lips_renamed AS (
+    SELECT 
+      VBELN AS `Delivery Number`,
+      POSNR AS `Delivery Line`,
+      VGBEL AS `Reference Doc`,
+      VGPOS AS `Reference Doc Item`,
+      LGMNG AS `Actual Delivery Quantity`
+    FROM LIPS
+  ),
+  likp_renamed AS (
+    SELECT 
+      VBELN,
+      BOLNR AS `Bill of Lading`,
+      LFART AS `Delivery Type`
+    FROM LIKP
+  ),
+  filtered_vbup AS (
+    SELECT 
+      VBELN,
+      POSNR,
+      WBSTA AS `Delivery Itm GI Status`
+    FROM VBUP
+    WHERE WBSTA = 'C'
+  ),
+  joined_data AS (
+    SELECT 
+      lip.`Delivery Number`,
+      lip.`Delivery Line`,
+      lip.`Reference Doc`,
+      lip.`Reference Doc Item`,
+      lip.`Actual Delivery Quantity`,
+      lik.`Bill of Lading`,
+      lik.`Delivery Type`,
+      vbu.`Delivery Itm GI Status`,
+      ekp.`Material`,
+      ekp.`Plant`,
+      tw.`Plant Name`,
+      ekk.`Delivery Created Date`,
+      lfa.`Vendor`,
+      lfa.`Vendor Name`,
+      adr.`Vendor Country`,
+      eke.`Batch`,
+      eke.`Delivery Date`,
+      eke.`Delivery Quantity unit`,
+      
+      -- Calculated columns
+      CASE 
+        WHEN lip.`Actual Delivery Quantity` > 0 
+        THEN CONCAT(lip.`Delivery Number`, ' - ', lip.`Delivery Line`) 
+      END AS `Delivery Lines GT0`,
+      CURRENT_DATE() AS `Report Date`,
+      DATE_FORMAT(CURRENT_TIMESTAMP(), 'HH:mm:ss') AS `Report Time`,
+      DATEDIFF(CURRENT_DATE(), eke.`Delivery Date`) AS `DaysPastDue`
+      
+    FROM lips_renamed lip
+    INNER JOIN filtered_vbup vbu 
+      ON lip.`Delivery Number` = vbu.VBELN AND lip.`Delivery Line` = vbu.POSNR
+    LEFT JOIN likp_renamed lik 
+      ON lip.`Delivery Number` = lik.VBELN
+    INNER JOIN filtered_ekpo ekp 
+      ON lip.`Reference Doc` = ekp.`PO Number` AND lip.`Reference Doc Item` = ekp.`PO Item`
+    LEFT JOIN ekko_renamed ekk 
+      ON ekp.`PO Number` = ekk.EBELN
+    LEFT JOIN eket_renamed eke 
+      ON ekp.`PO Number` = eke.EBELN AND ekp.`PO Item` = eke.EBELP
+    LEFT JOIN lfa1_renamed lfa 
+      ON ekk.LIFNR = lfa.`Vendor`
+    LEFT JOIN adrc_renamed adr 
+      ON lfa.ADRNR = adr.ADDRNUMBER
+    LEFT JOIN t001w_renamed tw 
+      ON ekp.`Plant` = tw.`Plant`
+  )
+
+SELECT 
+  *,
+  COUNT(`Delivery Lines GT0`) OVER (PARTITION BY `Delivery Number`) AS `Count of Delivery Lines GT0`
+FROM joined_data;
+
+
+
+
+
+
+
+
+
+
 import os
 from typing import List, Dict, Any, Optional, TypedDict
 from langchain_core.prompts import ChatPromptTemplate
