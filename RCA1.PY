@@ -1,3 +1,110 @@
+SELECT 
+  lips_renamed.`Delivery Number`,
+  lips_renamed.`Delivery Line`,
+  lips_renamed.`Reference Doc`,
+  lips_renamed.`Reference Doc Item`,
+  lips_renamed.`Actual Delivery Quantity`,
+  likp_renamed.`Bill of Lading`,
+  likp_renamed.`Delivery Type`,
+  lips_renamed.`Delivery Item GI Status`,
+  filtered_ekpo.`Material`,
+  filtered_ekpo.`Plant`,
+  t001w_renamed.`Plant Name`,
+  ekko_renamed.`Delivery Created Date`,
+  lfa1_renamed.`Vendor`,
+  lfa1_renamed.`Vendor Name`,
+  adrc_renamed.`Vendor Country`,
+  eket_renamed.`Batch`,
+  eket_renamed.`Delivery Date`,
+  eket_renamed.`Delivery Quantity unit`,
+  CASE 
+    WHEN lips_renamed.`Actual Delivery Quantity` > 0 
+    THEN CONCAT(lips_renamed.`Delivery Number`, ' - ', lips_renamed.`Delivery Line`) 
+  END AS `Delivery Lines GT0`,
+  CURRENT_DATE() AS `Report Date`,
+  DATE_FORMAT(CURRENT_TIMESTAMP(), 'HH:mm:ss') AS `Report Time`,
+  DATEDIFF(CURRENT_DATE(), eket_renamed.`Delivery Date`) AS `DaysPastDue`,
+  COUNT(CASE 
+    WHEN lips_renamed.`Actual Delivery Quantity` > 0 
+    THEN CONCAT(lips_renamed.`Delivery Number`, ' - ', lips_renamed.`Delivery Line`) END
+  ) OVER (PARTITION BY lips_renamed.`Delivery Number`) AS `Count of Delivery Lines GT0`
+FROM (
+  SELECT 
+    VBELN AS `Delivery Number`,
+    POSNR AS `Delivery Line`,
+    VGBEL AS `Reference Doc`,
+    VGPOS AS `Reference Doc Item`,
+    LGMNG AS `Actual Delivery Quantity`,
+    GBSTA AS `Delivery Item GI Status`
+  FROM LIPS
+  WHERE GBSTA = 'C'
+) AS lips_renamed
+INNER JOIN (
+  SELECT 
+    EBELN AS `PO Number`,
+    EBELP AS `PO Item`,
+    MATNR AS `Material`,
+    WERKS AS `Plant`
+  FROM EKPO
+  WHERE WERKS = 'CA01'
+) AS filtered_ekpo 
+  ON lips_renamed.`Reference Doc` = filtered_ekpo.`PO Number`
+  AND lips_renamed.`Reference Doc Item` = filtered_ekpo.`PO Item`
+LEFT JOIN (
+  SELECT 
+    VBELN,
+    BOLNR AS `Bill of Lading`,
+    LFART AS `Delivery Type`
+  FROM LIKP
+) AS likp_renamed 
+  ON lips_renamed.`Delivery Number` = likp_renamed.VBELN
+LEFT JOIN (
+  SELECT 
+    EBELN,
+    AEDAT AS `Delivery Created Date`,
+    LIFNR
+  FROM EKKO
+) AS ekko_renamed 
+  ON filtered_ekpo.`PO Number` = ekko_renamed.EBELN
+LEFT JOIN (
+  SELECT 
+    LIFNR AS `Vendor`,
+    NAME1 AS `Vendor Name`,
+    ADRNR
+  FROM LFA1
+) AS lfa1_renamed 
+  ON ekko_renamed.LIFNR = lfa1_renamed.`Vendor`
+LEFT JOIN (
+  SELECT 
+    ADDRNUMBER,
+    COUNTRY AS `Vendor Country`
+  FROM ADRC
+) AS adrc_renamed 
+  ON lfa1_renamed.ADRNR = adrc_renamed.ADDRNUMBER
+LEFT JOIN (
+  SELECT 
+    EBELN,
+    EBELP,
+    CHARG AS `Batch`,
+    EINDT AS `Delivery Date`,
+    GLMNG AS `Delivery Quantity unit`
+  FROM EKET
+) AS eket_renamed 
+  ON filtered_ekpo.`PO Number` = eket_renamed.EBELN 
+  AND filtered_ekpo.`PO Item` = eket_renamed.EBELP
+LEFT JOIN (
+  SELECT 
+    WERKS AS `Plant`,
+    NAME1 AS `Plant Name`
+  FROM T001W
+) AS t001w_renamed 
+  ON filtered_ekpo.`Plant` = t001w_renamed.`Plant`
+LIMIT 2;
+
+***************************************
+
+
+
 WITH 
   filtered_ekpo AS (
     SELECT 
