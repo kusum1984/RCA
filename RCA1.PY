@@ -50,6 +50,136 @@ WITH
       VGBEL AS `Reference Doc`,
       VGPOS AS `Reference Doc Item`,
       LGMNG AS `Actual Delivery Quantity`,
+      GBSTA AS `Delivery Item GI Status`  -- Changed from VBUP.WBSTA to LIPS.GBSTA
+    FROM LIPS
+    WHERE GBSTA = 'C'  -- Filter applied directly in LIPS
+  ),
+  likp_renamed AS (
+    SELECT 
+      VBELN,
+      BOLNR AS `Bill of Lading`,
+      LFART AS `Delivery Type`
+    FROM LIKP
+  ),
+  joined_data AS (
+    SELECT 
+      lips_renamed.`Delivery Number`,
+      lips_renamed.`Delivery Line`,
+      lips_renamed.`Reference Doc`,
+      lips_renamed.`Reference Doc Item`,
+      lips_renamed.`Actual Delivery Quantity`,
+      likp_renamed.`Bill of Lading`,
+      likp_renamed.`Delivery Type`,
+      lips_renamed.`Delivery Item GI Status`,  -- Now sourced from LIPS
+      filtered_ekpo.`Material`,
+      filtered_ekpo.`Plant`,
+      t001w_renamed.`Plant Name`,
+      ekko_renamed.`Delivery Created Date`,
+      lfa1_renamed.`Vendor`,
+      lfa1_renamed.`Vendor Name`,
+      adrc_renamed.`Vendor Country`,
+      eket_renamed.`Batch`,
+      eket_renamed.`Delivery Date`,
+      eket_renamed.`Delivery Quantity unit`,
+      CASE 
+        WHEN lips_renamed.`Actual Delivery Quantity` > 0 
+        THEN CONCAT(lips_renamed.`Delivery Number`, ' - ', lips_renamed.`Delivery Line`) 
+      END AS `Delivery Lines GT0`,
+      CURRENT_DATE() AS `Report Date`,
+      DATE_FORMAT(CURRENT_TIMESTAMP(), 'HH:mm:ss') AS `Report Time`,
+      DATEDIFF(CURRENT_DATE(), eket_renamed.`Delivery Date`) AS `DaysPastDue`
+    FROM lips_renamed
+    INNER JOIN likp_renamed 
+      ON lips_renamed.`Delivery Number` = likp_renamed.VBELN
+    INNER JOIN filtered_ekpo 
+      ON lips_renamed.`Reference Doc` = filtered_ekpo.`PO Number` 
+      AND lips_renamed.`Reference Doc Item` = filtered_ekpo.`PO Item`
+    LEFT JOIN ekko_renamed 
+      ON filtered_ekpo.`PO Number` = ekko_renamed.EBELN
+    LEFT JOIN eket_renamed 
+      ON filtered_ekpo.`PO Number` = eket_renamed.EBELN 
+      AND filtered_ekpo.`PO Item` = eket_renamed.EBELP
+    LEFT JOIN lfa1_renamed 
+      ON ekko_renamed.LIFNR = lfa1_renamed.`Vendor`
+    LEFT JOIN adrc_renamed 
+      ON lfa1_renamed.ADRNR = adrc_renamed.ADDRNUMBER
+    LEFT JOIN t001w_renamed 
+      ON filtered_ekpo.`Plant` = t001w_renamed.`Plant`
+  )
+
+SELECT 
+  *,
+  COUNT(`Delivery Lines GT0`) OVER (
+    PARTITION BY `Delivery Number`
+  ) AS `Count of Delivery Lines GT0`
+FROM joined_data
+LIMIT 2;
+
+-- Sample Output (2 simulated rows):
+-- | Delivery Number | Delivery Line | Reference Doc | Reference Doc Item | Actual Delivery Quantity | Bill of Lading | Delivery Type | Delivery Item GI Status | Material | Plant | Plant Name | Delivery Created Date | Vendor | Vendor Name | Vendor Country | Batch | Delivery Date | Delivery Quantity unit | Delivery Lines GT0 | Report Date | Report Time | DaysPastDue | Count of Delivery Lines GT0 |
+-- |-----------------|---------------|---------------|--------------------|--------------------------|----------------|---------------|-------------------------|----------|-------|------------|------------------------|--------|-------------|----------------|-------|---------------|-------------------------|--------------------|-------------|-------------|-------------|-----------------------------|
+-- | 0080000001      | 000010        | 4500000001    | 00010              | 100.00                   | BOL00001       | LF            | C                       | MAT0001  | CA01  | Toronto    | 2023-05-15            | V0001  | Vendor Inc  | CA             | BATCH1| 2023-05-20    | 100.00                 | 0080000001 - 000010| 2023-10-01  | 14:30:00    | 134         | 1                           |
+-- | 0080000002      | 000020        | 4500000002    | 00020              | 50.00                    | BOL00002       | LF            | C                       | MAT0002  | CA01  | Toronto    | 2023-05-16            | V0002  | Supplier Co | US             | BATCH2| 2023-05-21    | 50.00                  | 0080000002 - 000020| 2023-10-01  | 14:30:00    | 133         | 1                           |
+
+_______________________________________
+*********************************************************************************************************************
+
+
+
+
+
+WITH 
+  filtered_ekpo AS (
+    SELECT 
+      EBELN AS `PO Number`,
+      EBELP AS `PO Item`,
+      MATNR AS `Material`,
+      WERKS AS `Plant`
+    FROM EKPO
+    WHERE WERKS = 'CA01'
+  ),
+  adrc_renamed AS (
+    SELECT 
+      ADDRNUMBER,
+      COUNTRY AS `Vendor Country`
+    FROM ADRC
+  ),
+  eket_renamed AS (
+    SELECT 
+      EBELN,
+      EBELP,
+      CHARG AS `Batch`,
+      EINDT AS `Delivery Date`,
+      GLMNG AS `Delivery Quantity unit`
+    FROM EKET
+  ),
+  ekko_renamed AS (
+    SELECT 
+      EBELN,
+      AEDAT AS `Delivery Created Date`,
+      LIFNR
+    FROM EKKO
+  ),
+  lfa1_renamed AS (
+    SELECT 
+      LIFNR AS `Vendor`,
+      NAME1 AS `Vendor Name`,
+      ADRNR
+    FROM LFA1
+  ),
+  t001w_renamed AS (
+    SELECT 
+      WERKS AS `Plant`,
+      NAME1 AS `Plant Name`
+    FROM T001W
+  ),
+  lips_renamed AS (
+    SELECT 
+      VBELN AS `Delivery Number`,
+      POSNR AS `Delivery Line`,
+      VGBEL AS `Reference Doc`,
+      VGPOS AS `Reference Doc Item`,
+      LGMNG AS `Actual Delivery Quantity`,
       WBSTA AS `Delivery Item GI Status`
     FROM LIPS
     WHERE WBSTA = 'C'
