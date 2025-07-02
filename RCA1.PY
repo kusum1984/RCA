@@ -1,4 +1,49 @@
 SELECT 
+  LIPS.VBELN AS `Delivery Number`,
+  LIPS.POSNR AS `Delivery Line`,
+  LIPS.VGBEL AS `Reference Doc`,
+  LIPS.VGPOS AS `Reference Doc Item`,
+  LIPS.LGMNG AS `Actual Delivery Quantity`,
+  LIPS.GBSTA AS `Delivery Item GI Status`,
+  EKPO.EBELN AS `PO Number`,
+  EKPO.EBELP AS `PO Item`,
+  EKPO.MATNR AS `Material`,
+  EKPO.WERKS AS `Plant`,
+  T001W.NAME1 AS `Plant Name`,
+  EKKO.AEDAT AS `Delivery Created Date`,
+  LFA1.LIFNR AS `Vendor`,
+  LFA1.NAME1 AS `Vendor Name`,
+  ADRC.COUNTRY AS `Vendor Country`,
+  EKET.CHARG AS `Batch`,
+  EKET.EINDT AS `Delivery Date`,
+  LIKP.BOLNR AS `Bill of Lading`,
+  LIKP.LFART AS `Delivery Type`
+FROM LIPS
+LEFT JOIN EKPO 
+  ON LIPS.VGBEL = EKPO.EBELN 
+  AND LIPS.VGPOS = EKPO.EBELP
+LEFT JOIN T001W 
+  ON EKPO.WERKS = T001W.WERKS
+LEFT JOIN EKKO 
+  ON EKPO.EBELN = EKKO.EBELN
+LEFT JOIN LFA1 
+  ON EKKO.LIFNR = LFA1.LIFNR
+LEFT JOIN ADRC 
+  ON LFA1.ADRNR = ADRC.ADDRNUMBER
+LEFT JOIN EKET 
+  ON EKPO.EBELN = EKET.EBELN 
+  AND EKPO.EBELP = EKET.EBELP
+LEFT JOIN LIKP 
+  ON LIPS.VBELN = LIKP.VBELN
+WHERE 
+  LIPS.GBSTA = 'C'  -- Delivery Item GI Status filter
+  AND EKPO.WERKS = 'CA01'  -- Plant filter
+LIMIT 2;
+
+***********************
+
+
+SELECT 
   lips_renamed.`Delivery Number`,
   lips_renamed.`Delivery Line`,
   lips_renamed.`Reference Doc`,
