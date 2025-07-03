@@ -1,4 +1,102 @@
 WITH filtered_ekpo AS (
+    SELECT EBELN, EBELP, MATNR, WERKS
+    FROM EKPO
+    WHERE WERKS = 'CA01'
+),
+eket_selected AS (
+    SELECT EBELN, EBELP, CHARG, EINDT, GLMNG
+    FROM EKET
+),
+ekko_selected AS (
+    SELECT EBELN, AEDAT, LIFNR
+    FROM EKKO
+),
+lfa1_selected AS (
+    SELECT LIFNR, NAME1 AS VENDOR_NAME, ADRNR
+    FROM LFA1
+),
+adrc_selected AS (
+    SELECT ADDRNUMBER, COUNTRY
+    FROM ADRC
+),
+t001w_selected AS (
+    SELECT WERKS, NAME1 AS PLANT_NAME
+    FROM T001W
+),
+vbfa_filtered AS (
+    SELECT VBELV, VBELN, POSNN
+    FROM VBFA
+    WHERE VBTYP_N = 'J'  -- 'J' = Delivery
+),
+likp_selected AS (
+    SELECT VBELN AS LIKP_VBELN, BOLNR, LFART
+    FROM LIKP
+),
+lips_selected AS (
+    SELECT VBELN AS LIPS_VBELN, POSNR, MATNR, VGBEL, VGPOS, LGMNG, WBSTA
+    FROM LIPS
+)
+
+SELECT 
+    ekko.AEDAT AS PO_CREATED_DATE,
+    ekpo.EBELN AS PO_NUMBER,
+    ekpo.EBELP AS PO_ITEM,
+    ekpo.MATNR AS MATERIAL,
+    ekpo.WERKS AS PLANT,
+    t001w.PLANT_NAME,
+
+    eket.CHARG AS BATCH,
+    eket.EINDT AS SCHEDULED_DATE,
+    eket.GLMNG AS SCHEDULE_QTY,
+
+    lfa1.LIFNR AS VENDOR_ID,
+    lfa1.VENDOR_NAME,
+    adrc.COUNTRY AS VENDOR_COUNTRY,
+
+    lips.LIPS_VBELN AS DELIVERY_NUM,
+    lips.POSNR AS DELIVERY_ITEM,
+    lips.LGMNG AS DELIVERED_QTY,
+    lips.WBSTA AS DELIVERY_STATUS,
+
+    likp.BOLNR AS BILL_OF_LADING,
+    likp.LFART AS DELIVERY_TYPE
+
+FROM filtered_ekpo ekpo
+LEFT JOIN eket_selected eket 
+    ON ekpo.EBELN = eket.EBELN AND ekpo.EBELP = eket.EBELP
+
+LEFT JOIN ekko_selected ekko 
+    ON ekpo.EBELN = ekko.EBELN
+
+LEFT JOIN lfa1_selected lfa1 
+    ON ekko.LIFNR = lfa1.LIFNR
+
+LEFT JOIN adrc_selected adrc 
+    ON lfa1.ADRNR = adrc.ADDRNUMBER
+
+LEFT JOIN t001w_selected t001w 
+    ON ekpo.WERKS = t001w.WERKS
+
+-- Link PO to delivery through VBFA
+LEFT JOIN vbfa_filtered vbfa 
+    ON ekpo.EBELN = vbfa.VBELV AND ekpo.EBELP = vbfa.POSNN
+
+-- Join to LIKP (delivery header)
+LEFT JOIN likp_selected likp 
+    ON vbfa.VBELN = likp.LIKP_VBELN
+
+-- Join to LIPS (delivery item)
+LEFT JOIN lips_selected lips 
+    ON vbfa.VBELN = lips.LIPS_VBELN AND vbfa.POSNN = lips.POSNR;
+
+
+**********************************************
+
+
+
+
+
+WITH filtered_ekpo AS (
     SELECT 
         EBELN, EBELP, MATNR, WERKS
     FROM EKPO
