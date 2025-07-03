@@ -1,3 +1,76 @@
+WITH filtered_ekpo AS (
+    SELECT 
+        EBELN, EBELP, MATNR, WERKS
+    FROM EKPO
+    WHERE WERKS = 'CA01'
+),
+eket_selected AS (
+    SELECT EBELN, EBELP, CHARG, EINDT, GLMNG
+    FROM EKET
+),
+ekko_selected AS (
+    SELECT EBELN, AEDAT, LIFNR
+    FROM EKKO
+),
+lfa1_selected AS (
+    SELECT LIFNR, NAME1 AS VENDOR_NAME, ADRNR
+    FROM LFA1
+),
+adrc_selected AS (
+    SELECT ADDRNUMBER, COUNTRY
+    FROM ADRC
+),
+t001w_selected AS (
+    SELECT WERKS, NAME1 AS PLANT_NAME
+    FROM T001W
+),
+lips_selected AS (
+    SELECT VGBEL, VGPOS, LGMNG, POSNR, VBELN, WBSTA, MATNR
+    FROM LIPS
+),
+likp_selected AS (
+    SELECT VBELN, BOLNR, LFART
+    FROM LIKP
+)
+
+SELECT 
+    ekko.AEDAT AS PO_CREATED_DATE,
+    ekpo.MATNR AS MATERIAL,
+    ekpo.WERKS AS PLANT,
+    t001w.PLANT_NAME,
+    
+    eket.CHARG AS BATCH,
+    eket.EINDT AS SCHEDULED_DATE,
+    eket.GLMNG AS SCHEDULE_QTY,
+
+    lfa1.LIFNR AS VENDOR_ID,
+    lfa1.VENDOR_NAME,
+    adrc.COUNTRY AS VENDOR_COUNTRY,
+
+    lips.VGBEL AS PO_NUMBER_LINK,
+    lips.VGPOS AS PO_ITEM_LINK,
+    lips.LGMNG AS DELIVERED_QTY,
+    lips.POSNR AS DELIVERY_ITEM,
+    lips.WBSTA AS DELIVERY_STATUS,
+    lips.VBELN AS DELIVERY_NUM,
+
+    likp.BOLNR AS BILL_OF_LADING,
+    likp.LFART AS DELIVERY_TYPE
+
+FROM filtered_ekpo ekpo
+LEFT JOIN eket_selected eket ON ekpo.EBELN = eket.EBELN AND ekpo.EBELP = eket.EBELP
+LEFT JOIN ekko_selected ekko ON ekpo.EBELN = ekko.EBELN
+LEFT JOIN lfa1_selected lfa1 ON ekko.LIFNR = lfa1.LIFNR
+LEFT JOIN adrc_selected adrc ON lfa1.ADRNR = adrc.ADDRNUMBER
+LEFT JOIN t001w_selected t001w ON ekpo.WERKS = t001w.WERKS
+LEFT JOIN lips_selected lips ON ekpo.EBELN = lips.VGBEL AND ekpo.EBELP = lips.VGPOS
+LEFT JOIN likp_selected likp ON lips.VBELN = likp.VBELN;
+
+
+********************************************
+
+
+
 SELECT 
   LIPS.VBELN AS `Delivery Number`,
   LIPS.POSNR AS `Delivery Line`,
