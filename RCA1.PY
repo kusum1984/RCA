@@ -1,3 +1,49 @@
+SELECT
+    -- Select the desired fields from each table, using aliases for clarity
+    ekko.ebeln AS purchase_order_number,
+    ekko.lifnr AS vendor_number_ekko,
+    ekpo.ebelp AS item_number,
+    eket.eindt AS delivery_date,
+    eket.menge AS schedule_line_quantity,
+    lfa1.lifnr AS vendor_number_lfa1,
+    lfa1.name1 AS vendor_name,
+    adrc.addrnumber AS address_number,
+    adrc.street AS street_name,
+    t001w.werks AS plant_number_t001w,
+    t001w.name1 AS plant_name,
+    likp.vbeln AS delivery_number,
+    likp.wadat_ist AS goods_movement_date,
+    lips.posnr AS delivery_item_number,
+    lips.matnr AS material_number
+FROM
+    ekko  -- Purchasing document header
+INNER JOIN
+    ekpo ON ekko.ebeln = ekpo.ebeln -- Link EKKO to EKPO by Purchase Order Number
+INNER JOIN
+    eket ON ekko.ebeln = eket.ebeln AND ekpo.ebelp = eket.ebelp -- Link EKKO and EKPO to EKET by Purchase Order Number and Item Number
+INNER JOIN
+    lfa1 ON ekko.lifnr = lfa1.lifnr -- Link EKKO to LFA1 by Vendor Number
+LEFT OUTER JOIN -- Use LEFT OUTER JOIN to include vendors without an address entry in ADRC
+    adrc ON lfa1.adrnr = adrc.addrnumber -- Link LFA1 to ADRC by Address Number
+LEFT OUTER JOIN -- Use LEFT OUTER JOIN as not all EKKO records will have a supplying plant
+    t001w ON ekko.reswk = t001w.werks -- Link EKKO to T001W by Supplying Plant
+LEFT OUTER JOIN -- Use LEFT OUTER JOIN as not all PO items will have corresponding deliveries
+    lips ON ekpo.ebeln = lips.vgbeli AND ekpo.ebelp = lips.vgposi -- Link EKPO to LIPS by Purchase Order Number and Item Number of preceding document
+LEFT OUTER JOIN -- Use LEFT OUTER JOIN as not all delivery items will have a delivery header
+    likp ON lips.vbeln = likp.vbeln -- Link LIPS to LIKP by Delivery Number
+WHERE
+    -- Add your desired filtering criteria here
+    -- For example:
+    -- ekko.ebeln = 'YOUR_PO_NUMBER'
+    -- OR
+    -- likp.vbeln = 'YOUR_DELIVERY_NUMBER'
+;
+
+*****************************************
+*************************************************
+
+
+
 WITH filtered_ekpo AS (
     SELECT EBELN, EBELP, MATNR, WERKS
     FROM EKPO
