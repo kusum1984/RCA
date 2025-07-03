@@ -19,6 +19,75 @@ SELECT
   lfa1.NAME1 AS `Vendor Name`,
   adrc.COUNTRY AS `Vendor Country`,
 
+  -- Delivery Details
+  lips.VGBEL AS `Reference Doc`,
+  lips.VGPOS AS `Reference Doc Item`,
+  lips.LGMNG AS `Actual Delivery Quantity`,
+  lips.POSNR AS `Delivery Line`,
+  lips.VBELN AS `Delivery Number`,
+  lips.WBSTA AS `Delivery Itm GI Status`,
+
+  likp.BOLNR AS `Bill of Lading`,
+  likp.LFART AS `Delivery Type`,
+
+  -- Calculated Columns
+  CASE 
+    WHEN lips.LGMNG > 0 THEN CONCAT(lips.VBELN, lips.POSNR)
+    ELSE NULL 
+  END AS `Delivery Lines GT0`,
+
+  COUNT(
+    CASE WHEN lips.LGMNG > 0 THEN 1 END
+  ) OVER (PARTITION BY ekpo.EBELN, ekpo.EBELP) AS `Count of Delivery Lines GT0`,
+
+  DATEDIFF(CURRENT_DATE(), eket.EINDT) AS `DaysPastDue`,
+  CURRENT_DATE() AS `Report Date`,
+  CURRENT_TIMESTAMP() AS `Report Time`
+
+FROM EKPO ekpo
+
+LEFT JOIN EKKO ekko ON ekpo.EBELN = ekko.EBELN
+LEFT JOIN EKET eket ON ekpo.EBELN = eket.EBELN AND ekpo.EBELP = eket.EBELP
+LEFT JOIN LFA1 lfa1 ON ekko.LIFNR = lfa1.LIFNR
+LEFT JOIN ADRC adrc ON lfa1.ADRNR = adrc.ADDRNUMBER
+LEFT JOIN T001W t001w ON ekpo.WERKS = t001w.WERKS
+
+-- Use FULL OUTER JOIN for Delivery Flow
+FULL OUTER JOIN VBFA vbfa 
+  ON ekpo.EBELN = vbfa.VBELV 
+  AND ekpo.EBELP = vbfa.POSNV 
+  AND vbfa.VBTYP_N = 'J'
+
+FULL OUTER JOIN LIKP likp 
+  ON vbfa.VBELN = likp.VBELN
+
+FULL OUTER JOIN LIPS lips 
+  ON likp.VBELN = lips.VBELN 
+  AND vbfa.POSNN = lips.POSNR
+
+WHERE COALESCE(ekpo.WERKS, 'CA01') = 'CA01'
+******************************************
+SELECT
+  -- EKPO
+  ekpo.EBELN AS `PO Number`,
+  ekpo.EBELP AS `PO Item`,
+  ekpo.MATNR AS `Material`,
+  ekpo.WERKS AS `Plant`,
+  t001w.NAME1 AS `Plant Name`,
+
+  -- EKKO
+  ekko.AEDAT AS `Delivery Created Date`,
+
+  -- EKET
+  eket.CHARG AS `Batch`,
+  eket.EINDT AS `Delivery Date`,
+  eket.GLMNG AS `Delivery Quantity unit`,
+
+  -- LFA1 / ADRC
+  lfa1.LIFNR AS `Vendor`,
+  lfa1.NAME1 AS `Vendor Name`,
+  adrc.COUNTRY AS `Vendor Country`,
+
   -- VBFA → LIKP / LIPS
   lips.VGBEL AS `Reference Doc`,
   lips.VGPOS AS `Reference Doc Item`,
