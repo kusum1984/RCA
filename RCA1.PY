@@ -1,4 +1,86 @@
 SELECT
+  -- EKPO (Driving Table)
+  ekpo.EBELN AS `PO Number`,
+  ekpo.EBELP AS `PO Item`,
+  ekpo.MATNR AS `Material`,
+  ekpo.WERKS AS `Plant`,
+
+  -- Calculated Filter (plant = 'CA01')
+  t001w.NAME1 AS `Plant Name`,
+
+  -- EKKO
+  ekko.AEDAT AS `Delivery Created Date`,
+
+  -- EKET
+  eket.CHARG AS `Batch`,
+  eket.EINDT AS `Delivery Date`,
+  eket.GLMNG AS `Delivery Quantity unit`,
+
+  -- LFA1 and ADRC
+  lfa1.LIFNR AS `Vendor`,
+  lfa1.NAME1 AS `Vendor Name`,
+  adrc.COUNTRY AS `Vendor Country`,
+
+  -- LIPS
+  lips.VGBEL AS `Reference Doc`,
+  lips.VGPOS AS `Reference Doc Item`,
+  lips.LGMNG AS `Actual Delivery Quantity`,
+  lips.POSNR AS `Delivery Line`,
+  lips.VBELN AS `Delivery Number`,
+  lips.WBSTA AS `Delivery Itm GI Status`,
+
+  -- LIKP
+  likp.BOLNR AS `Bill of Lading`,
+  likp.LFART AS `Delivery Type`,
+
+  -- Calculated Columns
+  CASE 
+    WHEN lips.LGMNG > 0 THEN CONCAT(lips.VBELN, lips.POSNR) 
+    ELSE NULL 
+  END AS `Delivery Lines GT0`,
+
+  COUNT(
+    CASE 
+      WHEN lips.LGMNG > 0 THEN 1 
+      ELSE NULL 
+    END
+  ) OVER (PARTITION BY ekpo.EBELN, ekpo.EBELP) AS `Count of Delivery Lines GT0`,
+
+  DATEDIFF(CURRENT_DATE(), eket.EINDT) AS `DaysPastDue`,
+  CURRENT_DATE() AS `Report Date`,
+  CURRENT_TIMESTAMP() AS `Report Time`
+
+FROM EKPO ekpo
+
+-- Only records from plant 'CA01'
+WHERE ekpo.WERKS = 'CA01'
+
+-- Join EKKO (PO Header)
+LEFT JOIN EKKO ekko ON ekpo.EBELN = ekko.EBELN
+
+-- Join EKET (Schedule lines)
+LEFT JOIN EKET eket ON ekpo.EBELN = eket.EBELN AND ekpo.EBELP = eket.EBELP
+
+-- Join LFA1 (Vendor master)
+LEFT JOIN LFA1 lfa1 ON ekko.LIFNR = lfa1.LIFNR
+
+-- Join ADRC (Vendor address)
+LEFT JOIN ADRC adrc ON lfa1.ADRNR = adrc.ADDRNUMBER
+
+-- Join T001W (Plant master)
+LEFT JOIN T001W t001w ON ekpo.WERKS = t001w.WERKS
+
+-- Join LIPS (Delivery Item)
+LEFT JOIN LIPS lips ON ekpo.EBELN = lips.VGBEL AND ekpo.EBELP = lips.VGPOS AND lips.WBSTA = 'C'
+
+-- Join LIKP (Delivery Header)
+LEFT JOIN LIKP likp ON lips.VBELN = likp.VBELN
+
+
+**********************************
+
+
+SELECT
     -- Select the desired fields from each table, using aliases for clarity
     ekko.ebeln AS purchase_order_number,
     ekko.lifnr AS vendor_number_ekko,
