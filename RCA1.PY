@@ -1,3 +1,57 @@
+SELECT 
+  LIPS.VBELN AS `Delivery Number`,
+  LIPS.POSNR AS `Delivery Line`,
+  LIPS.VGBEL AS `Reference Doc`,
+  LIPS.VGPOS AS `Reference Doc Item`,
+  LIPS.LGMNG AS `Actual Delivery Quantity`,
+  LIPS.GBSTA AS `Delivery Item GI Status`,
+  EKPO.MATNR AS `Material`,
+  EKPO.WERKS AS `Plant`,
+  T001W.NAME1 AS `Plant Name`,
+  EKKO.AEDAT AS `Delivery Created Date`,
+  LFA1.LIFNR AS `Vendor`,
+  LFA1.NAME1 AS `Vendor Name`,
+  ADRC.COUNTRY AS `Vendor Country`,
+  EKET.CHARG AS `Batch`,
+  EKET.EINDT AS `Delivery Date`,
+  EKET.GLMNG AS `Delivery Quantity unit`,
+  LIKP.BOLNR AS `Bill of Lading`,
+  LIKP.LFART AS `Delivery Type`,
+  /* Calculated columns */
+  CASE WHEN LIPS.LGMNG > 0 
+       THEN CONCAT(LIPS.VBELN, ' - ', LIPS.POSNR) 
+  END AS `Delivery Lines GT0`,
+  COUNT(CASE WHEN LIPS.LGMNG > 0 THEN 1 END) 
+      OVER (PARTITION BY LIPS.VBELN) AS `Count of Delivery Lines GT0`,
+  CURRENT_DATE() AS `Report Date`,
+  CURRENT_TIME() AS `Report Time`,
+  DATEDIFF(CURRENT_DATE(), EKET.EINDT) AS `DaysPastDue`
+FROM LIPS
+/* Core joins with purchase order data */
+INNER JOIN EKPO 
+  ON LIPS.VGBEL = EKPO.EBELN 
+  AND LIPS.VGPOS = EKPO.EBELP
+  AND EKPO.WERKS = 'CA01'  -- Plant filter
+/* Left joins to preserve all delivery data */
+LEFT JOIN T001W 
+  ON EKPO.WERKS = T001W.WERKS
+LEFT JOIN EKKO 
+  ON EKPO.EBELN = EKKO.EBELN
+LEFT JOIN LFA1 
+  ON EKKO.LIFNR = LFA1.LIFNR
+LEFT JOIN ADRC 
+  ON LFA1.ADRNR = ADRC.ADDRNUMBER
+LEFT JOIN EKET 
+  ON EKPO.EBELN = EKET.EBELN 
+  AND EKPO.EBELP = EKET.EBELP
+LEFT JOIN LIKP 
+  ON LIPS.VBELN = LIKP.VBELN
+WHERE LIPS.GBSTA = 'C';  -- Delivery status filter
+
+******************************
+
+
+
 SELECT
   -- EKPO (PO Item)
   ekpo.EBELN AS `PO Number`,
