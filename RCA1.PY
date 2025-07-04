@@ -1,3 +1,104 @@
+-- Step 1: Key format analysis
+SELECT 
+  'LIPS' AS table_name,
+  MAX(LENGTH(VGBEL)) AS max_refdoc_length,
+  MAX(LENGTH(VGPOS)) AS max_item_length,
+  COUNT(DISTINCT VGBEL) AS distinct_refdocs,
+  COUNT(*) AS total_records
+FROM LIPS
+WHERE WBSTA = 'C'
+
+UNION ALL
+
+SELECT 
+  'EKPO',
+  MAX(LENGTH(EBELN)),
+  MAX(LENGTH(EBELP)),
+  COUNT(DISTINCT EBELN),
+  COUNT(*)
+FROM EKPO
+WHERE WERKS = 'CA01';
+
+-- Step 2: Sample record comparison
+SELECT 
+  LIPS.VGBEL AS lips_refdoc,
+  EKPO.EBELN AS ekpo_refdoc,
+  LIPS.VGPOS AS lips_item,
+  EKPO.EBELP AS ekpo_item,
+  LENGTH(LIPS.VGBEL) AS lips_refdoc_len,
+  LENGTH(EKPO.EBELN) AS ekpo_refdoc_len,
+  LENGTH(LIPS.VGPOS) AS lips_item_len,
+  LENGTH(EKPO.EBELP) AS ekpo_item_len
+FROM LIPS
+LEFT JOIN EKPO 
+  ON 1=1  -- Cartesian join for comparison
+WHERE LIPS.WBSTA = 'C'
+  AND EKPO.WERKS = 'CA01'
+LIMIT 100;
+
+-- Step 3: Revised production query
+SELECT 
+  LIPS.VBELN AS `Delivery Number`,
+  LIPS.POSNR AS `Delivery Line`,
+  LIPS.VGBEL AS `Reference Doc`,
+  LIPS.VGPOS AS `Reference Doc Item`,
+  LIPS.LGMNG AS `Actual Delivery Quantity`,
+  LIPS.WBSTA AS `Delivery Item GI Status`,
+  
+  EKPO.MATNR AS `Material`,
+  EKPO.WERKS AS `Plant`,
+  T001W.NAME1 AS `Plant Name`,
+  EKKO.AEDAT AS `Delivery Created Date`,
+  LFA1.LIFNR AS `Vendor`,
+  LFA1.NAME1 AS `Vendor Name`,
+  ADRC.COUNTRY AS `Vendor Country`,
+  EKET.CHARG AS `Batch`,
+  EKET.EINDT AS `Delivery Date`,
+  EKET.GLMNG AS `Delivery Quantity unit`,
+  LIKP.BOLNR AS `Bill of Lading`,
+  LIKP.LFART AS `Delivery Type`,
+  
+  /* Calculated columns */
+  CASE WHEN LIPS.LGMNG > 0 
+       THEN CONCAT(LIPS.VBELN, ' - ', LIPS.POSNR) 
+  END AS `Delivery Lines GT0`,
+  COUNT(CASE WHEN LIPS.LGMNG > 0 THEN 1 END) 
+      OVER (PARTITION BY LIPS.VBELN) AS `Count of Delivery Lines GT0`,
+  CURRENT_DATE() AS `Report Date`,
+  DATE_FORMAT(CURRENT_TIMESTAMP(), 'HH:mm:ss') AS `Report Time`,
+  DATEDIFF(CURRENT_DATE(), EKET.EINDT) AS `DaysPastDue`
+FROM LIPS
+/* New join strategy */
+INNER JOIN EKPO 
+  ON LIPS.MANDT = EKPO.MANDT  -- Crucial SAP client field
+  AND LIPS.VGBEL = EKPO.EBELN 
+  AND LIPS.VGPOS = EKPO.EBELP
+/* Plant filter moved to WHERE clause */
+INNER JOIN T001W 
+  ON EKPO.WERKS = T001W.WERKS
+INNER JOIN EKKO 
+  ON EKPO.MANDT = EKKO.MANDT 
+  AND EKPO.EBELN = EKKO.EBELN
+INNER JOIN LFA1 
+  ON EKKO.MANDT = LFA1.MANDT 
+  AND EKKO.LIFNR = LFA1.LIFNR
+LEFT JOIN ADRC 
+  ON LFA1.MANDT = ADRC.MANDT 
+  AND LFA1.ADRNR = ADRC.ADDRNUMBER
+LEFT JOIN EKET 
+  ON EKPO.MANDT = EKET.MANDT 
+  AND EKPO.EBELN = EKET.EBELN 
+  AND EKPO.EBELP = EKET.EBELP
+INNER JOIN LIKP 
+  ON LIPS.MANDT = LIKP.MANDT 
+  AND LIPS.VBELN = LIKP.VBELN
+WHERE 
+  LIPS.WBSTA = 'C'
+  AND EKPO.WERKS = 'CA01';
+
+**********************************
+
+
 -- First, run this diagnostic to check key matching
 SELECT 
   'Key Mismatch Analysis' AS analysis,
