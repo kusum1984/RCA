@@ -25,6 +25,90 @@ FROM (
     -- T001W
     t001w.NAME1 AS `Plant Name`,
 
+    -- LIPS (Delivery Items)
+    lips.VGBEL AS `Reference Doc`,
+    lips.VGPOS AS `Reference Doc Item`,
+    lips.LGMNG AS `Actual Delivery Quantity`,
+    lips.POSNR AS `Delivery Line`,
+    lips.VBELN AS `Delivery Number`,
+    lips.WBSTA AS `Delivery Itm GI Status`,
+
+    -- LIKP (Delivery Header)
+    likp.BOLNR AS `Bill of Lading`,
+    likp.LFART AS `Delivery Type`,
+
+    -- Calculated fields
+    CASE 
+      WHEN lips.LGMNG > 0 THEN CONCAT(lips.VBELN, lips.POSNR)
+      ELSE NULL
+    END AS `Delivery Lines GT0`,
+
+    CURRENT_DATE() AS `Report Date`,
+    CURRENT_TIMESTAMP() AS `Report Time`,
+
+    DATEDIFF(CURRENT_DATE(), eket.EINDT) AS `DaysPastDue`
+
+  FROM EKPO ekpo
+
+  LEFT JOIN EKET eket
+    ON ekpo.EBELN = eket.EBELN AND ekpo.EBELP = eket.EBELP
+
+  LEFT JOIN EKKO ekko
+    ON ekpo.EBELN = ekko.EBELN
+
+  LEFT JOIN LFA1 lfa1
+    ON ekko.LIFNR = lfa1.LIFNR
+
+  LEFT JOIN ADRC adrc
+    ON lfa1.ADRNR = adrc.ADRNR
+
+  LEFT JOIN T001W t001w
+    ON ekpo.WERKS = t001w.WERKS
+
+  -- 🔁 Direct join between EKPO and LIPS
+  LEFT JOIN LIPS lips
+    ON ekpo.EBELN = lips.VGBEL
+    AND ekpo.EBELP = lips.VGPOS
+    AND lips.WBSTA = 'C'
+
+  -- 🔁 LIKP join through LIPS
+  LEFT JOIN LIKP likp
+    ON lips.VBELN = likp.VBELN
+
+  WHERE ekpo.WERKS = 'CA01'
+) AS subquery
+
+*************************************************
+
+
+
+SELECT
+  *,
+  COUNT(`Delivery Lines GT0`) OVER () AS `Count of Delivery Lines GT0`
+FROM (
+  SELECT
+    -- ADRC
+    adrc.COUNTRY AS `Vendor Country`,
+
+    -- EKET
+    eket.CHARG AS `Batch`,
+    eket.EINDT AS `Delivery Date`,
+    eket.GLMNG AS `Delivery Quantity Unit`,
+
+    -- EKKO
+    ekko.AEDAT AS `Delivery Created Date`,
+
+    -- EKPO
+    ekpo.MATNR AS `Material`,
+    ekpo.WERKS AS `Plant`,
+
+    -- LFA1
+    lfa1.LIFNR AS `Vendor`,
+    lfa1.NAME1 AS `Vendor Name`,
+
+    -- T001W
+    t001w.NAME1 AS `Plant Name`,
+
     -- LIPS via VBFA
     lips.VGBEL AS `Reference Doc`,
     lips.VGPOS AS `Reference Doc Item`,
