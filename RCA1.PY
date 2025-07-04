@@ -1,3 +1,59 @@
+-- First, verify existence of filtered data
+SELECT 
+  (SELECT COUNT(*) FROM LIPS WHERE GBSTA = 'C') AS lips_c_status_count,
+  (SELECT COUNT(*) FROM EKPO WHERE WERKS = 'CA01') AS ekpo_ca01_count,
+  (SELECT COUNT(*) 
+   FROM LIPS 
+   JOIN EKPO 
+     ON LIPS.VGBEL = EKPO.EBELN 
+     AND LIPS.VGPOS = EKPO.EBELP
+   WHERE LIPS.GBSTA = 'C' 
+     AND EKPO.WERKS = 'CA01') AS joined_records_count;
+
+-- If counts are zero, remove filters temporarily
+SELECT 
+  LIPS.VBELN AS `Delivery Number`,
+  LIPS.POSNR AS `Delivery Line`,
+  LIPS.VGBEL AS `Reference Doc`,
+  LIPS.VGPOS AS `Reference Doc Item`,
+  LIPS.LGMNG AS `Actual Delivery Quantity`,
+  LIPS.GBSTA AS `Delivery Item GI Status`,
+  EKPO.MATNR AS `Material`,
+  EKPO.WERKS AS `Plant`,
+  T001W.NAME1 AS `Plant Name`,
+  EKKO.AEDAT AS `Delivery Created Date`,
+  LFA1.LIFNR AS `Vendor`,
+  LFA1.NAME1 AS `Vendor Name`,
+  ADRC.COUNTRY AS `Vendor Country`,
+  EKET.CHARG AS `Batch`,
+  EKET.EINDT AS `Delivery Date`,
+  EKET.GLMNG AS `Delivery Quantity unit`,
+  LIKP.BOLNR AS `Bill of Lading`,
+  LIKP.LFART AS `Delivery Type`
+FROM LIPS
+LEFT JOIN EKPO 
+  ON LIPS.VGBEL = EKPO.EBELN 
+  AND LIPS.VGPOS = EKPO.EBELP
+LEFT JOIN T001W 
+  ON EKPO.WERKS = T001W.WERKS
+LEFT JOIN EKKO 
+  ON EKPO.EBELN = EKKO.EBELN
+LEFT JOIN LFA1 
+  ON EKKO.LIFNR = LFA1.LIFNR
+LEFT JOIN ADRC 
+  ON LFA1.ADRNR = ADRC.ADDRNUMBER
+LEFT JOIN EKET 
+  ON EKPO.EBELN = EKET.EBELN 
+  AND EKPO.EBELP = EKET.EBELP
+LEFT JOIN LIKP 
+  ON LIPS.VBELN = LIKP.VBELN
+-- WHERE LIPS.GBSTA = 'C'  -- Commented out for debugging
+-- AND EKPO.WERKS = 'CA01' -- Commented out for debugging
+LIMIT 5;
+
+____________________________
+
+
 SELECT 
   LIPS.VBELN AS `Delivery Number`,
   LIPS.POSNR AS `Delivery Line`,
