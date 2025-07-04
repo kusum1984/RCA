@@ -1,3 +1,92 @@
+-- First, run this diagnostic to check key matching
+SELECT 
+  'Key Mismatch Analysis' AS analysis,
+  COUNT(*) AS total_lips_records,
+  COUNT(EKPO.EBELN) AS matching_po_records,
+  COUNT(T001W.WERKS) AS matching_plant_records,
+  COUNT(EKKO.EBELN) AS matching_po_header,
+  COUNT(LFA1.LIFNR) AS matching_vendors
+FROM LIPS
+LEFT JOIN EKPO 
+  ON TRIM(LIPS.VGBEL) = TRIM(EKPO.EBELN)
+  AND LPAD(TRIM(LIPS.VGPOS), 5, '0') = LPAD(TRIM(EKPO.EBELP), 5, '0')
+LEFT JOIN T001W 
+  ON EKPO.WERKS = T001W.WERKS
+LEFT JOIN EKKO 
+  ON EKPO.EBELN = EKKO.EBELN
+LEFT JOIN LFA1 
+  ON EKKO.LIFNR = LFA1.LIFNR
+WHERE LIPS.WBSTA = 'C';
+
+-- Now run the full query with improved joins
+SELECT 
+  LIPS.VBELN AS `Delivery Number`,
+  LIPS.POSNR AS `Delivery Line`,
+  LIPS.VGBEL AS `Reference Doc`,
+  LIPS.VGPOS AS `Reference Doc Item`,
+  LIPS.LGMNG AS `Actual Delivery Quantity`,
+  LIPS.WBSTA AS `Delivery Item GI Status`,
+  
+  -- EKPO fields
+  EKPO.MATNR AS `Material`,
+  EKPO.WERKS AS `Plant`,
+  
+  -- T001W field
+  T001W.NAME1 AS `Plant Name`,
+  
+  -- EKKO field
+  EKKO.AEDAT AS `Delivery Created Date`,
+  
+  -- LFA1 fields
+  LFA1.LIFNR AS `Vendor`,
+  LFA1.NAME1 AS `Vendor Name`,
+  
+  -- ADRC field
+  ADRC.COUNTRY AS `Vendor Country`,
+  
+  -- EKET fields
+  EKET.CHARG AS `Batch`,
+  EKET.EINDT AS `Delivery Date`,
+  EKET.GLMNG AS `Delivery Quantity unit`,
+  
+  -- LIKP fields
+  LIKP.BOLNR AS `Bill of Lading`,
+  LIKP.LFART AS `Delivery Type`,
+  
+  /* Calculated columns */
+  CASE WHEN LIPS.LGMNG > 0 
+       THEN CONCAT(LIPS.VBELN, ' - ', LIPS.POSNR) 
+  END AS `Delivery Lines GT0`,
+  COUNT(CASE WHEN LIPS.LGMNG > 0 THEN 1 END) 
+      OVER (PARTITION BY LIPS.VBELN) AS `Count of Delivery Lines GT0`,
+  CURRENT_DATE() AS `Report Date`,
+  DATE_FORMAT(CURRENT_TIMESTAMP(), 'HH:mm:ss') AS `Report Time`,
+  DATEDIFF(CURRENT_DATE(), EKET.EINDT) AS `DaysPastDue`
+FROM LIPS
+/* Join EKPO with case-insensitive comparison */
+INNER JOIN EKPO 
+  ON UPPER(TRIM(LIPS.VGBEL)) = UPPER(TRIM(EKPO.EBELN))
+  AND UPPER(LPAD(TRIM(LIPS.VGPOS), 5, '0')) = UPPER(LPAD(TRIM(EKPO.EBELP), 5, '0'))
+  AND EKPO.WERKS = 'CA01'
+  
+/* Join other tables */
+INNER JOIN T001W 
+  ON EKPO.WERKS = T001W.WERKS
+INNER JOIN EKKO 
+  ON EKPO.EBELN = EKKO.EBELN
+INNER JOIN LFA1 
+  ON EKKO.LIFNR = LFA1.LIFNR
+INNER JOIN ADRC 
+  ON LFA1.ADRNR = ADRC.ADDRNUMBER
+LEFT JOIN EKET 
+  ON EKPO.EBELN = EKET.EBELN 
+  AND EKPO.EBELP = EKET.EBELP
+INNER JOIN LIKP 
+  ON LIPS.VBELN = LIKP.VBELN
+WHERE LIPS.WBSTA = 'C';
+
+
+**********************************************
 SELECT 
   LIPS.VBELN AS `Delivery Number`,
   LIPS.POSNR AS `Delivery Line`,
