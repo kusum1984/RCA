@@ -1,4 +1,91 @@
 SELECT
+  -- EKPO (PO Item)
+  ekpo.EBELN AS `PO Number`,
+  ekpo.EBELP AS `PO Item`,
+  ekpo.MATNR AS `Material`,
+  ekpo.WERKS AS `Plant`,
+  t001w.NAME1 AS `Plant Name`,
+
+  -- EKKO (PO Header)
+  ekko.AEDAT AS `Delivery Created Date`,
+
+  -- EKET (Scheduling Agreement)
+  eket.CHARG AS `Batch`,
+  eket.EINDT AS `Delivery Date`,
+  eket.GLMNG AS `Delivery Quantity unit`,
+
+  -- LFA1 (Vendor)
+  lfa1.LIFNR AS `Vendor`,
+  lfa1.NAME1 AS `Vendor Name`,
+
+  -- ADRC (Vendor Address)
+  adrc.COUNTRY AS `Vendor Country`,
+
+  -- LIPS (Delivery Item)
+  lips.VGBEL AS `Reference Doc`,
+  lips.VGPOS AS `Reference Doc Item`,
+  lips.LGMNG AS `Actual Delivery Quantity`,
+  lips.POSNR AS `Delivery Line`,
+  lips.VBELN AS `Delivery Number`,
+  lips.WBSTA AS `Delivery Itm GI Status`,
+
+  -- LIKP (Delivery Header)
+  likp.BOLNR AS `Bill of Lading`,
+  likp.LFART AS `Delivery Type`,
+
+  -- Derived: Delivery Lines GT0 (only when quantity > 0)
+  CASE 
+    WHEN lips.LGMNG > 0 THEN CONCAT(lips.VBELN, lips.POSNR)
+    ELSE NULL 
+  END AS `Delivery Lines GT0`,
+
+  -- Derived: Count of lines with delivery quantity > 0
+  COUNT(CASE WHEN lips.LGMNG > 0 THEN 1 END) OVER (PARTITION BY ekpo.EBELN, ekpo.EBELP) AS `Count of Delivery Lines GT0`,
+
+  -- Derived: Days past due (based on delivery date)
+  DATEDIFF(CURRENT_DATE(), eket.EINDT) AS `DaysPastDue`,
+
+  -- Report Meta Info
+  CURRENT_DATE() AS `Report Date`,
+  CURRENT_TIMESTAMP() AS `Report Time`
+
+FROM EKPO ekpo
+
+-- Join EKKO (PO Header)
+LEFT JOIN EKKO ekko ON ekpo.EBELN = ekko.EBELN
+
+-- Join EKET (Schedule lines)
+LEFT JOIN EKET eket ON ekpo.EBELN = eket.EBELN AND ekpo.EBELP = eket.EBELP
+
+-- Join LFA1 (Vendor master)
+LEFT JOIN LFA1 lfa1 ON ekko.LIFNR = lfa1.LIFNR
+
+-- Join ADRC (Vendor address - address number)
+LEFT JOIN ADRC adrc ON lfa1.ADRNR = adrc.ADDRNUMBER
+
+-- Join T001W (Plant names)
+LEFT JOIN T001W t001w ON ekpo.WERKS = t001w.WERKS
+
+-- Join VBFA to trace delivery flow from PO
+LEFT JOIN VBFA vbfa 
+  ON ekpo.EBELN = vbfa.VBELV 
+  AND ekpo.EBELP = vbfa.POSNV 
+  AND vbfa.VBTYP_N = 'J' -- Outbound Delivery
+
+-- Join LIKP (Delivery Header)
+LEFT JOIN LIKP likp ON vbfa.VBELN = likp.VBELN
+
+-- Join LIPS (Delivery Item) — Filter for GI status = 'C'
+LEFT JOIN LIPS lips 
+  ON lips.VBELN = vbfa.VBELN 
+  AND lips.POSNR = vbfa.POSNN 
+  AND lips.WBSTA = 'C'
+
+-- Apply mandatory plant filter at base level
+WHERE ekpo.WERKS = 'CA01'
+
+*****************************************************
+SELECT
   -- EKPO
   ekpo.EBELN AS `PO Number`,
   ekpo.EBELP AS `PO Item`,
