@@ -1,3 +1,67 @@
+SELECT 
+  LIPS.VBELN AS `Delivery Number`,
+  LIPS.POSNR AS `Delivery Line`,
+  LIPS.VGBEL AS `Reference Doc`,
+  LIPS.VGPOS AS `Reference Doc Item`,
+  LIPS.LGMNG AS `Actual Delivery Quantity`,
+  LIPS.GBSTA AS `Delivery Item GI Status`,
+  EKPO.MATNR AS `Material`,
+  EKPO.WERKS AS `Plant`,
+  T001W.NAME1 AS `Plant Name`,
+  EKKO.AEDAT AS `Delivery Created Date`,
+  LFA1.LIFNR AS `Vendor`,
+  LFA1.NAME1 AS `Vendor Name`,
+  ADRC.COUNTRY AS `Vendor Country`,
+  EKET.CHARG AS `Batch`,
+  EKET.EINDT AS `Delivery Date`,
+  EKET.GLMNG AS `Delivery Quantity unit`,
+  LIKP.BOLNR AS `Bill of Lading`,
+  LIKP.LFART AS `Delivery Type`,
+  /* Calculated columns */
+  CASE WHEN LIPS.LGMNG > 0 
+       THEN CONCAT(LIPS.VBELN, ' - ', LIPS.POSNR) 
+  END AS `Delivery Lines GT0`,
+  COUNT(CASE WHEN LIPS.LGMNG > 0 THEN 1 END) 
+      OVER (PARTITION BY LIPS.VBELN) AS `Count of Delivery Lines GT0`,
+  CURRENT_DATE() AS `Report Date`,
+  DATE_FORMAT(CURRENT_TIMESTAMP(), 'HH:mm:ss') AS `Report Time`,
+  DATEDIFF(CURRENT_DATE(), EKET.EINDT) AS `DaysPastDue`
+FROM LIPS
+/* Revised join strategy with key normalization */
+LEFT JOIN (
+  SELECT 
+    EBELN, 
+    EBELP, 
+    MATNR, 
+    WERKS,
+    /* Normalize keys to handle formatting issues */
+    TRIM(EBELN) AS norm_ebeln,
+    LPAD(TRIM(EBELP), 5, '0') AS norm_ebelp
+  FROM EKPO 
+  WHERE WERKS = 'CA01'
+) AS EKPO 
+  ON TRIM(LIPS.VGBEL) = EKPO.norm_ebeln
+  AND LPAD(TRIM(LIPS.VGPOS), 5, '0') = EKPO.norm_ebelp
+/* Left joins to preserve all data */
+LEFT JOIN T001W 
+  ON EKPO.WERKS = T001W.WERKS
+LEFT JOIN EKKO 
+  ON EKPO.EBELN = EKKO.EBELN
+LEFT JOIN LFA1 
+  ON EKKO.LIFNR = LFA1.LIFNR
+LEFT JOIN ADRC 
+  ON LFA1.ADRNR = ADRC.ADDRNUMBER
+LEFT JOIN EKET 
+  ON EKPO.EBELN = EKET.EBELN 
+  AND EKPO.EBELP = EKET.EBELP
+LEFT JOIN LIKP 
+  ON LIPS.VBELN = LIKP.VBELN
+WHERE LIPS.GBSTA = 'C';
+
+*************************
+
+
+
 -- First, verify existence of filtered data
 SELECT 
   (SELECT COUNT(*) FROM LIPS WHERE GBSTA = 'C') AS lips_c_status_count,
