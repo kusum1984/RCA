@@ -1,3 +1,61 @@
+RP0441
+
+
+SELECT 
+  -- MKPF (Document headers)
+  CAST(mkpf.BLDAT AS DATE) AS `Document Date`,
+  CAST(mkpf.BUDAT AS DATE) AS `Posting Date`,
+
+  -- MSEG (Line items)
+  CAST(mseg.DMBTR AS INT) AS `Amount In LC`,
+  mseg.CHARG AS `Batch`,
+  mseg.WAERS AS `Currency`,
+  CAST(mseg.MATNR AS STRING) AS `Material`,
+  CAST(mseg.MBLNR AS STRING) AS `Material Document`,
+  CAST(mseg.BWART AS STRING) AS `Movement Type`,
+  CAST(mseg.WERKS AS STRING) AS `Plant`,
+  CAST(mseg.ERFMG AS INT) AS `Quantity In UOE`,
+  CAST(mseg.GRUND AS INT) AS `Reason for Movement`,
+  CAST(mseg.BESTQ AS STRING) AS `Stock Category`,
+  CAST(mseg.LGORT AS INT) AS `Storage Location`,
+  mseg.ERFME AS `Unity of Entry`,
+
+  -- MCH1 (Batch created by user)
+  CAST(mch1.ERNAM AS STRING) AS `Created By User`,
+
+  -- T157E (Movement reason description)
+  t157e.GRTXT AS `Reason for Movement Desc`,
+
+  -- MARA (Material master data)
+  mara.MTART AS `Material Type`,
+  mara.MAKTX AS `Material Description`,
+  mara.BRGEW AS `Business Unit`, -- assuming BRGEW is used for business unit; adjust if different
+
+  -- CALCULATED COLUMNS
+  CASE 
+    WHEN mseg.BWART IN ('702', '704', '708', '711', '713', '715', '717') 
+    THEN -1 * CAST(mseg.DMBTR AS INT) 
+    ELSE CAST(mseg.DMBTR AS INT) 
+  END AS `Net Amount In LC`,
+
+  CASE 
+    WHEN mseg.BWART IN ('702', '704', '708', '711', '713', '715', '717') 
+    THEN -1 * CAST(mseg.ERFMG AS INT) 
+    ELSE CAST(mseg.ERFMG AS INT) 
+  END AS `Net Quantity In UOE`
+
+FROM MSEG mseg
+LEFT JOIN MKPF mkpf ON mseg.MANDT = mkpf.MANDT AND mseg.MBLNR = mkpf.MBLNR AND mseg.MJAHR = mkpf.MJAHR
+LEFT JOIN MCH1 mch1 ON mseg.MANDT = mch1.MANDT AND mseg.CHARG = mch1.CHARG AND mseg.MATNR = mch1.MATNR
+LEFT JOIN T157E t157e ON mseg.MANDT = t157e.MANDT AND mseg.GRUND = t157e.GRUND
+LEFT JOIN MARA mara ON mseg.MANDT = mara.MANDT AND mseg.MATNR = mara.MATNR
+
+WHERE mseg.WERKS = 'CA01'
+
+
+
+
+*********************
 WITH ekpo_filtered AS (
   SELECT *
   FROM EKPO
