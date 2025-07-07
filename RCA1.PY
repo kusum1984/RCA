@@ -63,7 +63,37 @@ SELECT
   CASE 
     WHEN lips.LGMNG > 0 THEN CONCAT(lips.VBELN, lips.POSNR) 
     ELSE NULL 
-  END AS `Deliv
+  END AS `Delivery Lines GT0`,
+
+  COUNT(CASE WHEN lips.LGMNG > 0 THEN 1 END) OVER (PARTITION BY ekpo_filtered.EBELN) AS `Count of Delivery Lines GT0`,
+
+  DATEDIFF(CURRENT_DATE, TO_DATE(eket.EINDT, 'yyyyMMdd')) AS `DaysPastDue`,
+  CURRENT_DATE() AS `Report Date`,
+  CURRENT_TIMESTAMP() AS `Report Time`
+
+FROM ekpo_filtered
+LEFT JOIN EKET eket 
+  ON ekpo_filtered.EBELN = eket.EBELN AND ekpo_filtered.EBELP = eket.EBELP
+LEFT JOIN EKKO ekko 
+  ON ekpo_filtered.EBELN = ekko.EBELN
+LEFT JOIN LFA1 lfa1 
+  ON ekko.LIFNR = lfa1.LIFNR
+LEFT JOIN ADRC adrc 
+  ON lfa1.ADRNR = adrc.ADDRNUMBER
+LEFT JOIN T001W t001w 
+  ON ekpo_filtered.WERKS = t001w.WERKS
+
+-- JOIN to Delivery via PO → Delivery mapping table
+LEFT JOIN po_delivery_link link 
+  ON ekpo_filtered.EBELN = link.PO_NUMBER AND ekpo_filtered.EBELP = link.PO_ITEM
+LEFT JOIN LIKP likp 
+  ON link.DELIVERY_NUMBER = likp.VBELN
+LEFT JOIN LIPS lips 
+  ON likp.VBELN = lips.VBELN
+
+-- Only delivered lines with status 'C'
+WHERE lips.WBSTA = 'C'
+
 
 **********************************************
 
