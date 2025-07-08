@@ -1,21 +1,18 @@
 RP0441
 
 SELECT 
-  mseg.MATNR                        AS Material,
-  kla.CLASS                        AS ClassNumber,
-  ausp.ATINN                       AS CharacteristicID,
-  MAX(ausp.ATWRT)                  AS ClassificationValue
-FROM MSEG mseg
+  inob.OBJEK           AS Material_Key,
+  klah.CLASS           AS Class_Number,
+  ausp.ATINN           AS Characteristic_ID,
+  ausp.ATWRT           AS Characteristic_Value
+FROM AUSP ausp
+JOIN INOB inob 
+  ON ausp.OBJEK = inob.OBJEK
+JOIN KLAH klah 
+  ON inob.CLINT = klah.CLINT
+WHERE ausp.ATWRT = 'Janssen Cold Chain'
+  AND ausp.KLART = '001'  -- optional: '001' is usually for material classification
 
-JOIN AUSP ausp 
-  ON mseg.MATNR = SUBSTR(ausp.OBJEK, 1, LENGTH(mseg.MATNR))  -- Ensure object key matches material
-JOIN KLAH kla
-  ON ausp.CLASS = kla.CLASS AND ausp.KLART = kla.KLART
-
-WHERE ausp.ATWRT = 'Janssen Cold Chain'    -- Your classification value
-  AND mseg.WERKS = 'CA01'                   -- Optional plant filter
-
-GROUP BY mseg.MATNR, kla.CLASS, ausp.ATINN;
 
 
 
