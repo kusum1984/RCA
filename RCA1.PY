@@ -1,5 +1,26 @@
 RP0441
 
+SELECT 
+  mseg.MATNR                        AS Material,
+  kla.CLASS                        AS ClassNumber,
+  ausp.ATINN                       AS CharacteristicID,
+  MAX(ausp.ATWRT)                  AS ClassificationValue
+FROM MSEG mseg
+
+JOIN AUSP ausp 
+  ON mseg.MATNR = SUBSTR(ausp.OBJEK, 1, LENGTH(mseg.MATNR))  -- Ensure object key matches material
+JOIN KLAH kla
+  ON ausp.CLASS = kla.CLASS AND ausp.KLART = kla.KLART
+
+WHERE ausp.ATWRT = 'Janssen Cold Chain'    -- Your classification value
+  AND mseg.WERKS = 'CA01'                   -- Optional plant filter
+
+GROUP BY mseg.MATNR, kla.CLASS, ausp.ATINN;
+
+
+
+______________________
+
 
 SELECT 
   -- MKPF (Document headers)
